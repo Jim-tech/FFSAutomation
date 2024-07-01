@@ -143,46 +143,6 @@ def execute_test_ugs(device, saved_wifi_ssid):
         logger.error(traceback.format_exc())
         return False
 
-def execute_factory_reset(device, device_name):
-    try:
-        logger.info("Factory resetting the device")
-        restart_alexa_app(device)
-        logger.info("Switching to device page...")
-        device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
-        time.sleep(3)
-
-        device.swipe_ext("down")
-        time.sleep(2)
-        device.swipe_ext("down")
-        time.sleep(3)
-
-        logger.info(f"Locating the device '{device_name}' ...")
-        device(scrollable=True).scroll.to(text=device_name)
-
-        logger.info(f"Clicking into the GUI page of the device '{device_name}' ...")
-        device(resourceId="mosaic.text", text=device_name).click()
-
-        logger.info(f"Loading the GUI page of the device '{device_name}' ...")
-        device.xpath('//*[@content-desc="Settings"]/android.widget.ImageView[1]').wait(60)
-
-        logger.info(f"Clicking the setting button of the device '{device_name}' ...")
-        device.xpath('//*[@content-desc="Settings"]/android.widget.ImageView[1]').click()
-        device.xpath('//*[@content-desc="Delete"]/android.widget.ImageView[1]').wait(10)
-
-        logger.info(f"Clicking the delete button of the device '{device_name}' ...")
-        device.xpath('//*[@content-desc="Delete"]/android.widget.ImageView[1]').click()
-        device.xpath('//*[@resource-id="android:id/button1"]').wait(10)
-
-        logger.info(f"Confirming the deletion of the device '{device_name}' ...")
-        device.xpath('//*[@resource-id="android:id/button1"]').click()
-        time.sleep(2)
-        logger.info(f"Device {device_name} is removed from Alexa!")
-        return True
-    except Exception:
-        logger.error("Exception happened")
-        logger.error(traceback.format_exc())
-        return False
-
 def execute_test_bcs(device, saved_wifi_ssid):
     try:
         logger.info("Starting BCS test...")
@@ -251,8 +211,96 @@ def execute_test_bcs(device, saved_wifi_ssid):
         logger.error(traceback.format_exc())
         return False
 
-def execute_test_zts(device, saved_wifi_ssid):
-    pass
+def execute_device_discovering(device):
+    try:
+        logger.info("Starting discovering...")        
+        restart_alexa_app(device)
+        logger.info("Switching to device page...")
+        device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
+        time.sleep(3)
+
+        device(resourceId="com.amazon.dee.app:id/fab").wait(10)
+        device(resourceId="com.amazon.dee.app:id/fab").click()
+        device.clear_text()
+        device.send_keys("discover device")
+        device.send_action()
+
+        return True
+    except Exception:
+        logger.error("Exception happened")
+        logger.error(traceback.format_exc())
+        return False
+
+def execute_test_zts(device, device_name):
+    try:
+        logger.info("Starting ZTS test...")
+        if execute_device_discovering(device) is True:
+            time.sleep(2)
+        else:
+            logger.error(f"failed to start device discovering.")
+            return False
+        
+        restart_alexa_app(device)
+        logger.info("Switching to device page...")
+        device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
+        time.sleep(3)
+
+        time_passed = 0
+        while time_passed < 60:
+            device.swipe_ext("down")
+            time.sleep(2)
+            time_passed = time_passed + 2
+
+            if device.exists(resourceId="mosaic.text", text=device_name):
+                logger.info(f"Target device {device_name} found!")
+                return True
+
+        logger.error(f"Target device {device_name} not found during 60s.")
+        return False
+    except Exception:
+        logger.error("Exception happened")
+        logger.error(traceback.format_exc())
+        return False
+
+def execute_factory_reset(device, device_name):
+    try:
+        logger.info("Factory resetting the device")
+        restart_alexa_app(device)
+        logger.info("Switching to device page...")
+        device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
+        time.sleep(3)
+
+        device.swipe_ext("down")
+        time.sleep(2)
+        device.swipe_ext("down")
+        time.sleep(3)
+
+        logger.info(f"Locating the device '{device_name}' ...")
+        device(scrollable=True).scroll.to(text=device_name)
+
+        logger.info(f"Clicking into the GUI page of the device '{device_name}' ...")
+        device(resourceId="mosaic.text", text=device_name).click()
+
+        logger.info(f"Loading the GUI page of the device '{device_name}' ...")
+        device.xpath('//*[@content-desc="Settings"]/android.widget.ImageView[1]').wait(60)
+
+        logger.info(f"Clicking the setting button of the device '{device_name}' ...")
+        device.xpath('//*[@content-desc="Settings"]/android.widget.ImageView[1]').click()
+        device.xpath('//*[@content-desc="Delete"]/android.widget.ImageView[1]').wait(10)
+
+        logger.info(f"Clicking the delete button of the device '{device_name}' ...")
+        device.xpath('//*[@content-desc="Delete"]/android.widget.ImageView[1]').click()
+        device.xpath('//*[@resource-id="android:id/button1"]').wait(10)
+
+        logger.info(f"Confirming the deletion of the device '{device_name}' ...")
+        device.xpath('//*[@resource-id="android:id/button1"]').click()
+        time.sleep(2)
+        logger.info(f"Device {device_name} is removed from Alexa!")
+        return True
+    except Exception:
+        logger.error("Exception happened")
+        logger.error(traceback.format_exc())
+        return False
 
 def main():
     parser = argparse.ArgumentParser(description="Run UGS tests on an Android device.")
@@ -281,7 +329,7 @@ def main():
         elif args.mode == 'BCS':
             test_result = execute_test_bcs(device, args.wifi_ssid)
         elif args.mode == 'ZTS':
-            test_result = execute_test_zts(device, args.wifi_ssid)
+            test_result = execute_test_zts(device, args.device_name)
 
         if test_result:
             success_cnt += 1
