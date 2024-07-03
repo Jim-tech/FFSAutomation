@@ -63,6 +63,20 @@ def log_error_info(device):
         logger.error(f'Error info: {error_info}')
     except Exception:
         logger.error("Could not retrieve error info")
+        logger.error(traceback.format_exc())
+
+def handle_lts_card(device):
+    try:
+        if device.exists(resourceId="FullScreenTakeover::PrimaryButton"):
+            device(resourceId="FullScreenTakeover::PrimaryButton").click()
+            device(resourceId="FullScreenTakeover::PrimaryButton").wait_gone(2)
+        if device.exists(text="LATER"):
+            device(text="LATER").click()
+            device(text="LATER").wait_gone(2)
+        pass
+    except Exception:
+        logger.error("Could not handle lts card")
+        logger.error(traceback.format_exc())
 
 # Test functions
 def execute_test_ugs(device, saved_wifi_ssid):
@@ -250,6 +264,8 @@ def execute_test_zts(device, device_name):
             device.swipe_ext("down")
             time.sleep(2)
             time_passed = time_passed + 2
+
+            handle_lts_card(device)
 
             if device.exists(resourceId="mosaic.text", text=device_name):
                 logger.info(f"Target device {device_name} found!")
