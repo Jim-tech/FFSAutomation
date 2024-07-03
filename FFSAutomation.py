@@ -14,11 +14,11 @@ ALEXA_APP_PACKAGE_NAME = "com.amazon.dee.app"
 # Logger setup
 logger = logging.getLogger(__name__)
 
-def setup_logging():
+def setup_logging(mode):
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     time_str = time.strftime("%Y-%m-%d_%H_%M_%S", time.localtime())
-    handler = logging.FileHandler(f"log_{time_str}.txt")
+    handler = logging.FileHandler(f"log_{mode}_{time_str}.txt")
     handler.setLevel(logging.INFO)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -65,6 +65,14 @@ def log_error_info(device):
         logger.error("Could not retrieve error info")
         logger.error(traceback.format_exc())
 
+def log_error_info_for_matter(device):
+    try:
+        error_info = device(resourceId="mosaic.base_text").get_text()
+        logger.error(f'Info about last page: {error_info}')
+    except Exception:
+        logger.error("Could not retrieve error info")
+        logger.error(traceback.format_exc())
+
 def handle_lts_card(device):
     try:
         if device.exists(resourceId="FullScreenTakeover::PrimaryButton"):
@@ -83,13 +91,15 @@ def execute_test_ugs(device, saved_wifi_ssid):
     try:
         logger.info("Starting UGS test...")
         restart_alexa_app(device)
+        handle_lts_card(device)
+        
         logger.info("Clicking button '+' ...")
         if not ui_click(device, "com.amazon.dee.app:id/home_header_quick_add", "1-primary", 10):
             logger.error("Unable to see the add device menu.")
             return False
 
         logger.info("Clicking button 'Add Device' ...")
-        if not ui_click(device, "1-primary", "AddDevicesLandingPage", 10):
+        if not ui_click_id(device, "1-primary", "AddDevicesLandingPage", 10):
             logger.error("Unable to see the AddDevicesLandingPage.")
             return False
 
@@ -161,13 +171,15 @@ def execute_test_bcs(device, saved_wifi_ssid):
     try:
         logger.info("Starting BCS test...")
         restart_alexa_app(device)
+        handle_lts_card(device)
+        
         logger.info("Clicking button '+' ...")
         if not ui_click(device, "com.amazon.dee.app:id/home_header_quick_add", "1-primary", 10):
             logger.error("Unable to see the add device menu.")
             return False
 
         logger.info("Clicking button 'Add Device' ...")
-        if not ui_click(device, "1-primary", "AddDevicesLandingPage", 10):
+        if not ui_click_id(device, "1-primary", "AddDevicesLandingPage", 10):
             logger.error("Unable to see the AddDevicesLandingPage.")
             return False
 
@@ -232,6 +244,7 @@ def execute_device_discovering(device):
         logger.info("Switching to device page...")
         device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
         time.sleep(3)
+        handle_lts_card(device)
 
         device(resourceId="com.amazon.dee.app:id/fab").wait(10)
         device(resourceId="com.amazon.dee.app:id/fab").click()
@@ -258,6 +271,7 @@ def execute_test_zts(device, device_name):
         logger.info("Switching to device page...")
         device.xpath('//*[@resource-id="com.amazon.dee.app:id/tab_channels_device_icon"]').click()
         time.sleep(3)
+        handle_lts_card(device)
 
         time_passed = 0
         while time_passed < 60:
@@ -273,6 +287,118 @@ def execute_test_zts(device, device_name):
 
         logger.error(f"Target device {device_name} not found during 60s.")
         return False
+    except Exception:
+        logger.error("Exception happened")
+        logger.error(traceback.format_exc())
+        return False
+
+def execute_test_matter(device, saved_wifi_ssid, pairing_code_11d):
+    try:
+        logger.info("Starting Matter setup test...")
+        restart_alexa_app(device)
+        logger.info("Clicking button '+' ...")
+        if not ui_click(device, "com.amazon.dee.app:id/home_header_quick_add", "1-primary", 10):
+            logger.error("Unable to see the add device menu.")
+            return False
+
+        time.sleep(1)
+
+        logger.info("Clicking button 'Add Device' ...")
+        if not ui_click(device, "1-primary", "AddDevicesLandingPage", 10):
+            logger.error("Unable to see the AddDevicesLandingPage.")
+            return False
+
+        logger.info("Scrolling down to find 'Other' ...")
+        # device(scrollable=True).scroll.to(steps=20, text="Other")
+        device(scrollable=True).scroll.toEnd()
+        time.sleep(3)
+        logger.info("Clicking 'Other' ...")
+        if not ui_click(device, "DeviceTypeRow_Other-primary", "mosaic-tiles_grid_0_genericMatter", 10):
+            logger.error("Unable to see the Generic Matter icon.")
+            return False
+        time.sleep(1)
+
+        logger.info("Clicking 'Matter' ...")
+        device(resourceId="mosaic-tiles_grid_0_genericMatter").click()
+        device(resourceId="mosaic.base_text", text="Does your device have a Matter logo?").wait(10)
+        if not ui_click_id_with_text(device, "mosaic.base_text", "YES", "power-on-check-footer-primary-btn", 10):
+            logger.error("Unable to see the InstructionalPage.")
+            return False
+
+        logger.info("Clicking 'Yes' to confirm device is powered on ...")
+        if not ui_click(device, "power-on-check-footer-primary-btn", "locate-qr-code-page-footer-secondary-btn", 10):
+            logger.error("Unable to see the InstructionalPage (Locate QR code).")
+            return False
+
+        logger.info("Clicking 'Try Numeric Code Instead?' to confirm using digital pairing code ...")
+        if not ui_click(device, "locate-qr-code-page-footer-secondary-btn", "locate-numerical-code-page-footer-primary-btn", 10):
+            logger.error("Unable to see the InstructionalPage (Locate the numeric code).")
+            return False
+
+        logger.info("Clicking 'Enter Code' to continue ...")
+        if not ui_click(device, "locate-numerical-code-page-footer-primary-btn", "input-numeric-code-page-BodyText", 10):
+            logger.error("Unable to see the page containing the input box for the numeric code.")
+            return False
+
+        # input the code
+        device.xpath('//android.widget.ScrollView/android.view.ViewGroup[1]/android.view.ViewGroup[1]').click()
+        device.clear_text()
+        logger.info(f"The 11-digits pairing code is: {pairing_code_11d}")
+        device.send_keys(f"{pairing_code_11d}")
+        device.send_action()
+        time.sleep(1)
+
+        logger.info("Clicking 'Next' to continue ...")
+        device(resourceId="input-numeric-code-page-footer-primary-btn").click()
+        device(resourceId="input-numeric-code-page-footer-primary-btn").wait_gone(2)
+
+        logger.info("Looking for the device ...")
+        device(resourceId="mosaic.base_text", text="Looking for your device").wait(timeout=10)
+        if not device(resourceId="mosaic.base_text", text="Looking for your device").wait_gone(timeout=30):
+            logger.error("Unable to find the device.")
+            log_error_info_for_matter(device)
+            return False
+
+        if device.exists(resourceId="mosaic.base_text", text="Still looking for your device"):
+            logger.info("Still looking for the device ...")
+            if not device(resourceId="mosaic.base_text", text="Still looking for your device").wait_gone(timeout=30):
+                logger.error("Unable to find the device after long retry.")
+                log_error_info_for_matter(device)
+                return False
+            else:
+                logger.info("Looking for the device ended...")
+                if device.exists(resourceId="mosaic.base_text", text="Is this device set up for control with another assistant or app?"):
+                    logger.error("Unable to find the device after final retry.")
+                    log_error_info_for_matter(device)
+                    return False
+
+        logger.info("Connecting to the device...")
+        if not device(resourceId="mosaic.base_text", text="Connecting to your device").wait_gone(timeout=30):
+            logger.error("Unable to connect to the device.")
+            log_error_info_for_matter(device)
+            return False
+
+        logger.info("Connecting the device to the network...")
+        if not device(resourceId="mosaic.base_text", text="Connecting your device to the network").wait_gone(timeout=30):
+            logger.error("Unable to connect the device to the network.")
+            log_error_info_for_matter(device)
+            return False
+
+        logger.info("Waiting for the msg `Alexa is getting your device ready` ...")
+        if not device(resourceId="mosaic.base_text", text="Alexa is getting your device ready").wait_gone(timeout=30):
+            logger.error("Unable to see the msg `Alexa is getting your device ready`.")
+            log_error_info_for_matter(device)
+            return False
+
+        logger.info("Waiting for completion ...")
+        if not device(resourceId="commissioning-complete-page").wait(60):
+            logger.error("Connecting to the device failed!")
+            log_error_info_for_matter(device)
+            return False
+
+        logger.info("Matter setup is successful!")
+        return True
+
     except Exception:
         logger.error("Exception happened")
         logger.error(traceback.format_exc())
@@ -319,19 +445,20 @@ def execute_factory_reset(device, device_name):
         return False
 
 def main():
-    parser = argparse.ArgumentParser(description="Run UGS tests on an Android device.")
-    parser.add_argument('--mode', type=str, default="UGS", help='Test mode. Valid values are: UGS, BCS and ZTS.')
+    parser = argparse.ArgumentParser(description="Run FFS tests on an Android device.")
+    parser.add_argument('--mode', type=str, default="UGS", help='Test mode. Valid values are: UGS, BCS, ZTS and Matter. Here: 1)UGS and BCS are for non-Matter ACK devices. 2)ZTS is for both Matter and non-Matter. 3)Matter is only for Matter device')
     parser.add_argument('--serial', type=str, default=ANDROID_SERIAL, help='The serial number of the Android device.')
     parser.add_argument('--wifi_ssid', type=str, default=SAVED_WIFI_SSID, help='The SSID of the WiFi network to connect to.')
     parser.add_argument('--device_name', type=str, default=DEFAULT_DEVICE_NAME, help='The name of the device on Alexa App.')
     parser.add_argument('--test_count', type=int, default=MAXIMUM_TEST_COUNT, help='The maximum number of tests to run.')
+    parser.add_argument('--pairing_code_11d', type=int, default=None, help='The 11-digits Matter pairing code')
 
     args = parser.parse_args()
 
-    setup_logging()
+    setup_logging(args.mode)
 
-    if args.mode not in ['UGS', 'BCS', 'ZTS']:
-        logger.error("Please input valid test mode. Valid values are: UGS, BCS and ZTS.")
+    if args.mode not in ['UGS', 'BCS', 'ZTS', 'Matter']:
+        logger.error("Please input valid test mode. Valid values are: UGS, BCS, ZTS and Matter.")
         return
 
     success_cnt = 0
@@ -346,6 +473,8 @@ def main():
             test_result = execute_test_bcs(device, args.wifi_ssid)
         elif args.mode == 'ZTS':
             test_result = execute_test_zts(device, args.device_name)
+        elif args.mode == 'Matter':
+            test_result = execute_test_matter(device, args.wifi_ssid, args.pairing_code_11d)
 
         if test_result:
             success_cnt += 1
