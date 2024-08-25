@@ -7,7 +7,7 @@ import time
 # Constants
 ANDROID_SERIAL = "4fe9718b"
 SAVED_WIFI_SSID = "test-xxzhkcgj"
-DEFAULT_DEVICE_NAME = "First light"
+DEFAULT_DEVICE_NAME = "Second plug"
 MAXIMUM_TEST_COUNT = 30
 ALEXA_APP_PACKAGE_NAME = "com.amazon.dee.app"
 
@@ -99,7 +99,7 @@ def execute_test_ugs(device, saved_wifi_ssid):
             return False
 
         logger.info("Clicking button 'Add Device' ...")
-        if not ui_click_id(device, "1-primary", "AddDevicesLandingPage", 10):
+        if not ui_click(device, "1-primary", "AddDevicesLandingPage", 10):
             logger.error("Unable to see the AddDevicesLandingPage.")
             return False
 
@@ -179,7 +179,7 @@ def execute_test_bcs(device, saved_wifi_ssid):
             return False
 
         logger.info("Clicking button 'Add Device' ...")
-        if not ui_click_id(device, "1-primary", "AddDevicesLandingPage", 10):
+        if not ui_click(device, "1-primary", "AddDevicesLandingPage", 10):
             logger.error("Unable to see the AddDevicesLandingPage.")
             return False
 
